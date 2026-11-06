@@ -1,9 +1,12 @@
 import { useLoaderData } from "react-router";
 import { useMemo, useState, useEffect, useRef } from "react";
 import prisma from "../db.server";
+import { authenticate } from "../shopify.server";
 
-export async function loader() {
+export async function loader({ request }) {
+  const { session } = await authenticate.admin(request);
   const surveys = await prisma.surveyResponse.findMany({
+    where: { shop: session.shop },
     orderBy: { createdAt: "desc" },
   });
   return { surveys };
