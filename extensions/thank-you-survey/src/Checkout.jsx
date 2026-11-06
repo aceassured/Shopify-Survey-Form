@@ -1,5 +1,6 @@
+import "@shopify/ui-extensions/preact";
 import { render } from "preact";
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 
 export default async function () {
   render(<Extension />, document.body);
@@ -9,34 +10,36 @@ function Extension() {
   const [selected, setSelected] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const submitting = useRef(false);
 
   async function handleSubmit() {
-    if (!selected) return;
+    if (submitting.current) return;
+    if (!selected) {
+      setError("Please select an option before submitting.");
+      return;
+    }
+
+    submitting.current = true;
+    setError("");
 
     try {
       setLoading(true);
 
       const orderId =
-      shopify?.orderConfirmation?.current?.order?.id || "";
+      shopify.orderConfirmation.value?.order?.id || "";
     
     const customerEmail =
-      shopify?.buyerIdentity?.email?.current || "";
+      shopify.buyerIdentity?.email?.value || "";
     
     const customerName =
-      shopify?.shippingAddress?.current?.name || "";
+      shopify.shippingAddress?.value?.name || "";
     
     const shop =
       shopify?.shop?.myshopifyDomain || "";
 
-      console.log({
-        orderId,
-        customerEmail,
-        customerName,
-        shop,
-      });
-
-      await fetch(
-        "https://health-mysql-villages-compromise.trycloudflare.com/api/survey",
+      const response = await fetch(
+        "https://shopify-survey-form-vjh2.onrender.com/api/survey",
         {
           method: "POST",
           headers: {
@@ -52,13 +55,19 @@ function Extension() {
         }
       );
 
+      if (!response.ok) throw new Error("Survey request failed");
+      const result = await response.json();
+      if (result.success !== true) throw new Error("Survey was not saved");
+
       setSubmitted(true);
 
     } catch (error) {
-      console.error(error);
+      console.error("Survey submission failed", error);
+      setError("We couldn't save your response. Please try submitting again.");
 
     } finally {
       setLoading(false);
+      submitting.current = false;
     }
   }
 
@@ -98,11 +107,14 @@ function Extension() {
 
         <s-choice-list
   name="survey"
-  value={selected}
+  values={selected ? [selected] : []}
+  disabled={loading}
   onChange={(event) => {
+    const choiceList = /** @type {EventTarget & { values: string[] }} */ (event.currentTarget);
     setSelected(
-      event.currentTarget.values[0]
+      choiceList.values[0] || ""
     );
+    setError("");
   }}
 >
 
@@ -148,9 +160,12 @@ function Extension() {
 
 </s-choice-list>
 
+        {error && <s-banner tone="critical">{error}</s-banner>}
+
         <s-button
           variant="secondary"
           loading={loading}
+          disabled={loading}
           onClick={handleSubmit}
         >
           Submit
